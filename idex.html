@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multimedia Graphics API Lab - 3D Pipeline Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            font-size: 1.8rem;
+            color: #00adb5;
+        }
+
+        p {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #eeeeee;
+            font-size: 0.9rem;
+        }
+
+        #canvas-container {
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #393e46;
+        }
+
+        canvas {
+            display: block;
+            background-color: #222831;
+        }
+
+        .legend {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .box {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>HTML5 Canvas Graphics Pipeline</h1>
+    <p>Simulating 3D Application, Geometry, and Rasterization Stages manually in JS</p>
+
+    <div id="canvas-container">
+        <canvas id="graphicsCanvas" width="800" height="500"></canvas>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="box" style="background: rgba(0, 173, 181, 0.2); border: 2px solid #00adb5;"></div>
+            <span>Object 1: 3D Cube</span>
+        </div>
+        <div class="legend-item">
+            <div class="box" style="background: rgba(255, 46, 99, 0.2); border: 2px solid #ff2e63;"></div>
+            <span>Object 2: 3D Pyramid</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('graphicsCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // =====================================================================
+        // STAGE 1: THE APPLICATION STAGE
+        // =====================================================================
+        // Memory allocation, defining raw 3D scene data (geometry/vertices), 
+        // handling frame rates, animations updates, and structural configurations.
+        
+        // --- Object 1: 3D Cube Definition ---
+        const cubeVertices = [
+            {x: -1, y: -1, z: -1}, {x: 1, y: -1, z: -1}, {x: 1, y: 1, z: -1}, {x: -1, y: 1, z: -1},
+            {x: -1, y: -1, z: 1},  {x: 1, y: -1, z: 1},  {x: 1, y: 1, z: 1},  {x: -1, y: 1, z: 1}
+        ];
+
+        const cubeFaces = [
+            [0, 1, 2, 3], // Back
+            [4, 5, 6, 7], // Front
+            [0, 1, 5, 4], // Top
+            [2, 3, 7, 6], // Bottom
+            [0, 3, 7, 4], // Left
+            [1, 2, 6, 5]  // Right
+        ];
+
+        // --- Object 2: 3D Pyramid (Tetrahedron) Definition ---
+        const pyramidVertices = [
+            {x: 0, y: -1.2, z: 0},     // Top peak
+            {x: -1, y: 0.8, z: -1},    // Base Left-Back
+            {x: 1, y: 0.8, z: -1},     // Base Right-Back
+            {x: 0, y: 0.8, z: 1}       // Base Front
+        ];
+
+        const pyramidFaces = [
+            [0, 1, 2], // Back Face
+            [0, 2, 3], // Right Face
+            [0, 3, 1], // Left Face
+            [1, 3, 2]  // Bottom Base
+        ];
+
+        // Animation/State variables maintained by the Application
+        let angleX = 0;
+        let angleY = 0;
+
+        // Projection Configuration (Simulating camera focal length)
+        const fieldOfView = 400; 
+
+        // Main Simulation/Render Loop (Application Stage driving execution)
+        function gameLoop() {
+            // Clear screen for new frame
+            ctx.clearRect(0, 0, width, height);
+
+            // Update application animations (state transformations over time)
+            angleX += 0.01;
+            angleY += 0.015;
+
+            // Render our distinct objects through the pipeline
+            // Object 1: Render Cube on the Left side (-200px shift in X)
+            renderObject(cubeVertices, cubeFaces, -200, 0, '#00adb5', 'rgba(0, 173, 181, 0.08)');
+            
+            // Object 2: Render Pyramid on the Right side (+200px shift in X)
+            renderObject(pyramidVertices, pyramidFaces, 200, 0, '#ff2e63', 'rgba(255, 46, 99, 0.08)');
+
+            requestAnimationFrame(gameLoop);
+        }
+
+
+        // Pipeline orchestrator for individual items
+        function renderObject(vertices, faces, offsetX, offsetY, strokeStyle, fillStyle) {
+            
+            // =====================================================================
+            // STAGE 2: THE GEOMETRY STAGE
+            // =====================================================================
+            // Vertex Processing: Vertex transformations (Rotation, Translation), 
+            // Projection from 3D space coordinates to 2D Screen Space coordinates.
+
+            let projectedVertices = [];
+
+            for (let i = 0; i < vertices.length; i++) {
+                let v = vertices[i];
+
+                // 1. Rotate around X axis
+                let cosX = Math.cos(angleX);
+                let sinX = Math.sin(angleX);
+                let y1 = v.y * cosX - v.z * sinX;
+                let z1 = v.y * sinX + v.z * cosX;
+
+                // 2. Rotate around Y axis
+                let cosY = Math.cos(angleY);
+                let sinY = Math.sin(angleY);
+                let x2 = v.x * cosY + z1 * sinY;
+                let z2 = -v.x * sinY + z1 * cosY;
+
+                // 3. Translation (Positioning objects out into the depth space 'Z' so they are viewable)
+                let finalX = x2;
+                let finalY = y1;
+                let finalZ = z2 + 3.5; // push depth away from camera view frame
+
+                // 4. Perspective Projection (Transforming 3D to 2D Screen Matrix coordinates)
+                // Formula: Screen Coordinate = (3D Coordinate * Focal Length) / Depth
+                let screenX = (finalX * fieldOfView) / finalZ + (width / 2) + offsetX;
+                let screenY = (finalY * fieldOfView) / finalZ + (height / 2) + offsetY;
+
+                projectedVertices.push({ x: screenX, y: screenY });
+            }
+
+            // =====================================================================
+            // STAGE 3: THE RASTERIZATION STAGE
+            // =====================================================================
+            // Conversion of geometric primitives (Faces/Lines/Polygons) into physical 
+            // colored screen pixels. Handled here via HTML5 Canvas drawing primitives.
+
+            for (let i = 0; i < faces.length; i++) {
+                const face = faces[i];
+                
+                ctx.beginPath();
+                // Move raster pointer to the first projected vertex point of the face
+                ctx.moveTo(projectedVertices[face[0]].x, projectedVertices[face[0]].y);
+
+                // Draw connecting edge lines to assemble the primitive polygon face
+                for (let j = 1; j < face.length; j++) {
+                    ctx.lineTo(projectedVertices[face[j]].x, projectedVertices[face[j]].y);
+                }
+                ctx.closePath();
+
+                // Fill pixel fragment zones (shading/filling polygon surface)
+                ctx.fillStyle = fillStyle;
+                ctx.fill();
+
+                // Stroke raster pixel borders (Wireframe assembly rendering)
+                ctx.strokeStyle = strokeStyle;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        // Kick off application loop
+        gameLoop();
+    </script>
+</body>
+</html>
